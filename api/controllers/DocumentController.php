@@ -100,37 +100,10 @@ class DocumentController extends BaseController {
         $this->mapDataToDocument($data, $document);
         $this->calculateTotals($document);
 
-        // Mettre à jour le document principal
-        $query = "UPDATE documents 
-                SET numero=:numero, type=:type, clientId=:clientId, 
-                    dateCreation=:dateCreation, dateEcheance=:dateEcheance, statut=:statut, 
-                    totalHT=:totalHT, totalTVA=:totalTVA, totalTTC=:totalTTC, 
-                    notes=:notes, conditions=:conditions, documentParentId=:documentParentId
-                WHERE id=:id";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(":id", $document->id);
-        $stmt->bindParam(":numero", $document->numero);
-        $stmt->bindParam(":type", $document->type);
-        $stmt->bindParam(":clientId", $document->clientId);
-        $stmt->bindParam(":dateCreation", $document->dateCreation);
-        $stmt->bindParam(":dateEcheance", $document->dateEcheance);
-        $stmt->bindParam(":statut", $document->statut);
-        $stmt->bindParam(":totalHT", $document->totalHT);
-        $stmt->bindParam(":totalTVA", $document->totalTVA);
-        $stmt->bindParam(":totalTTC", $document->totalTTC);
-        $stmt->bindParam(":notes", $document->notes);
-        $stmt->bindParam(":conditions", $document->conditions);
-        $stmt->bindParam(":documentParentId", $document->documentParentId);
-
-        if ($stmt->execute()) {
-            // Créer les nouvelles lignes
-            foreach ($document->lignes as $ligne) {
-                $document->createLigne($ligne);
-            }
+        if ($document->update()) {
             $this->sendResponse(["message" => "Document mis à jour avec succès."]);
         } else {
-            $this->sendError("Erreur lors de la mise à jour du document.", 500, $stmt->errorInfo());
+            $this->sendError("Erreur lors de la mise à jour du document.", 500, $document->getError());
         }
     }
 
@@ -177,6 +150,12 @@ class DocumentController extends BaseController {
         $newDoc->notes = $sourceDoc->notes;
         $newDoc->conditions = $sourceDoc->conditions;
         $newDoc->documentParentId = $sourceDoc->id;
+        
+        // Copie des en-têtes personnalisés
+        $newDoc->custom_to = $sourceDoc->custom_to;
+        $newDoc->custom_co = $sourceDoc->custom_co;
+        $newDoc->custom_group = $sourceDoc->custom_group;
+        $newDoc->custom_ice = $sourceDoc->custom_ice;
         
         // Copie profonde des lignes pour éviter les problèmes de référence
         $newDoc->lignes = [];
@@ -226,13 +205,58 @@ class DocumentController extends BaseController {
         try {
             $this->authenticate();
 
+            // Si post_max_size est dépassé, PHP vide $_POST/$_FILES.
+            if (
+                empty($_FILES) &&
+                isset($_SERVER['CONTENT_LENGTH']) &&
+                (int)$_SERVER['CONTENT_LENGTH'] > 0
+            ) {
+                $maxPostSize = ini_get('post_max_size');
+                $this->sendError(
+                    "Fichier trop volumineux pour le serveur (post_max_size={$maxPostSize}).",
+                    413
+                );
+            }
+
             if (!isset($_FILES['file'])) {
                 $this->sendError("Aucun fichier fourni.", 400);
             }
 
             $file = $_FILES['file'];
+            if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
+                $uploadError = isset($file['error']) ? (int)$file['error'] : -1;
+                $uploadMessages = [
+                    UPLOAD_ERR_INI_SIZE => "Le fichier dépasse la taille maximale autorisée par le serveur.",
+                    UPLOAD_ERR_FORM_SIZE => "Le fichier dépasse la taille maximale autorisée par le formulaire.",
+                    UPLOAD_ERR_PARTIAL => "Le fichier a été partiellement uploadé.",
+                    UPLOAD_ERR_NO_FILE => "Aucun fichier fourni.",
+                    UPLOAD_ERR_NO_TMP_DIR => "Dossier temporaire manquant côté serveur.",
+                    UPLOAD_ERR_CANT_WRITE => "Impossible d'écrire le fichier temporaire.",
+                    UPLOAD_ERR_EXTENSION => "Upload bloqué par une extension PHP."
+                ];
+                $this->sendError($uploadMessages[$uploadError] ?? "Erreur d'upload du fichier.", 400, ["uploadErrorCode" => $uploadError]);
+            }
+
             $tmp_path = $file['tmp_name'];
-            $mime_type = $file['type'];
+            $mime_type = '';
+            if (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $detected = finfo_file($finfo, $tmp_path);
+                    if ($detected !== false) {
+                        $mime_type = $detected;
+                    }
+                    finfo_close($finfo);
+                }
+            }
+
+            if (!$mime_type && isset($file['type'])) {
+                $mime_type = $file['type'];
+            }
+
+            if (!$mime_type) {
+                $this->sendError("Type MIME du fichier introuvable.", 400);
+            }
             
             error_log("IA - Fichier reçu : " . $file['name'] . " ($mime_type)");
 
@@ -240,15 +264,24 @@ class DocumentController extends BaseController {
                 $this->sendError("Fichier temporaire introuvable.", 500);
             }
 
+            $supportedMimeTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif'];
+            if (!in_array($mime_type, $supportedMimeTypes, true)) {
+                $this->sendError("Type de fichier non supporté : " . $mime_type, 400);
+            }
+
             $file_content = file_get_contents($tmp_path);
             if ($file_content === false) {
                 $this->sendError("Impossible de lire le fichier.", 500);
             }
 
-            // Logique d'extraction Gemini directement intégrée (sans require_once)
-            $api_key = "AIzaSyAEBTrpCTzpoPvsVtmA923_oBXjGSbGLAw";
-            $model = "gemini-2.0-flash"; 
-            $url = "https://generativelanguage.googleapis.com/v1/models/" . $model . ":generateContent?key=" . $api_key;
+            require_once __DIR__ . '/../config/config.php';
+            $api_key = fp_config()['gemini_api_key'] ?? '';
+            if ($api_key === '') {
+                $this->sendError(
+                    "Clé Gemini non configurée. Définissez gemini_api_key dans config.local.php ou la variable d'environnement GEMINI_API_KEY.",
+                    500
+                );
+            }
 
             $file_data = base64_encode($file_content);
 
@@ -290,25 +323,62 @@ class DocumentController extends BaseController {
                 ]
             ];
 
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            // Fallback automatique: certains modèles/versions ne sont plus disponibles selon la clé.
+            $modelCandidates = [
+                ['apiVersion' => 'v1', 'model' => 'gemini-2.0-flash'],
+                ['apiVersion' => 'v1beta', 'model' => 'gemini-2.0-flash'],
+                ['apiVersion' => 'v1beta', 'model' => 'gemini-2.0-flash-lite'],
+                ['apiVersion' => 'v1beta', 'model' => 'gemini-1.5-flash-latest'],
+                ['apiVersion' => 'v1beta', 'model' => 'gemini-1.5-pro-latest'],
+                ['apiVersion' => 'v1beta', 'model' => 'gemini-1.5-flash-8b'],
+                ['apiVersion' => 'v1beta', 'model' => 'gemini-1.5-flash']
+            ];
 
-            $response = curl_exec($ch);
-            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            $response = null;
+            $http_code = 0;
+            $error_details = null;
+            $selectedModel = null;
 
-            if ($http_code === 429) {
-                $this->sendError("Quota IA dépassé.", 429);
+            foreach ($modelCandidates as $candidate) {
+                $url = "https://generativelanguage.googleapis.com/" . $candidate['apiVersion'] . "/models/" . $candidate['model'] . ":generateContent?key=" . $api_key;
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+                $candidateResponse = curl_exec($ch);
+                $candidateHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($candidateHttpCode === 200) {
+                    $response = $candidateResponse;
+                    $http_code = $candidateHttpCode;
+                    $selectedModel = $candidate['apiVersion'] . "/" . $candidate['model'];
+                    break;
+                }
+
+                if ($candidateHttpCode === 429) {
+                    $this->sendError("Le quota gratuit de l'IA est atteint. Veuillez réessayer dans une minute.", 429);
+                }
+
+                $response = $candidateResponse;
+                $http_code = $candidateHttpCode;
+                $error_details = json_decode($candidateResponse, true);
             }
 
             if ($http_code !== 200) {
-                $error_details = json_decode($response, true);
-                $this->sendError("Erreur Gemini ($http_code)", 500, $error_details);
+                $msg = "Erreur Gemini ($http_code)";
+                if (isset($error_details['error']['message'])) {
+                    $msg .= " : " . $error_details['error']['message'];
+                }
+                $this->sendError($msg, 500, $error_details);
+            }
+
+            if ($selectedModel) {
+                error_log("IA - Modèle Gemini utilisé : " . $selectedModel);
             }
 
             $result = json_decode($response, true);

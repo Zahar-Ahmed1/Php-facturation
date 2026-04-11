@@ -1,0 +1,10 @@
+RewriteEngine On
+
+# Autoriser le passage du header Authorization à PHP sur Apache
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Si l'URL commence par api/, on l'enlève pour le routage
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]

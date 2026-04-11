@@ -1,0 +1,18 @@
+<?php
+
+/**
+ * Copiez ce fichier vers config.local.php sur le serveur (et en local si besoin).
+ * config.local.php ne doit pas être versionné (voir .gitignore).
+ */
+return [
+    'db_host' => 'localhost',
+    'db_name' => 'votre_base_mysql',
+    'db_user' => 'votre_utilisateur_mysql',
+    'db_pass' => 'votre_mot_de_passe',
+
+    /** Chaîne longue et aléatoire (JWT) — générez-en une nouvelle pour la production */
+    'jwt_secret' => 'changez_moi_avec_une_longue_chaine_aleatoire',
+
+    /** Clé API Google AI Studio / Gemini */
+    'gemini_api_key' => 'AIza...',
+];

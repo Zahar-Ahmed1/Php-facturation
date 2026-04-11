@@ -1,11 +1,21 @@
 <?php
 
+require_once __DIR__ . '/config.php';
+
 class Database {
-    private $host = "localhost";
-    private $db_name = "commercial_db";
-    private $username = "root";
-    private $password = "";
+    private $host;
+    private $db_name;
+    private $username;
+    private $password;
     public $conn;
+
+    public function __construct() {
+        $c = fp_config();
+        $this->host = $c['db_host'];
+        $this->db_name = $c['db_name'];
+        $this->username = $c['db_user'];
+        $this->password = $c['db_pass'];
+    }
 
     public function getConnection() {
         $this->conn = null;

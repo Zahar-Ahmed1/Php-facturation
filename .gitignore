@@ -1,0 +1,26 @@
+# Configuration locale
+api/config/config.local.php
+
+# Base de données locale
+api/database/*.sqlite
+api/database/*.db
+
+# Dépendances (si ajoutées plus tard)
+vendor/
+node_modules/
+
+# Logs et temporaires
+*.log
+tmp/
+temp/
+
+# Système
+.DS_Store
+Thumbs.db
+
+# Environnement
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

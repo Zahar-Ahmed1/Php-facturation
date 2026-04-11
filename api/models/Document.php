@@ -17,6 +17,12 @@ class Document {
     public $notes = "";
     public $conditions = "";
     public $documentParentId = null;
+    public $custom_to = "";
+    public $custom_co = "";
+    public $custom_group = "";
+    public $custom_ice = "";
+    public $numBC = "";
+    public $showRacineInfo = false;
     public $lignes = [];
 
     private $error;
@@ -98,13 +104,14 @@ class Document {
             $query = "INSERT INTO " . $this->table_name . " 
                     SET id=:id, numero=:numero, type=:type, clientId=:clientId, 
                         dateCreation=:dateCreation, dateEcheance=:dateEcheance, statut=:statut, 
-                        totalHT=:totalHT, totalTVA=:totalTVA, totalTTC=:totalTTC, 
-                        notes=:notes, conditions=:conditions, documentParentId=:documentParentId";
-            
+                    totalHT=:totalHT, totalTVA=:totalTVA, totalTTC=:totalTTC, 
+                    notes=:notes, conditions=:conditions, documentParentId=:documentParentId,
+                    custom_to=:custom_to, custom_co=:custom_co, custom_group=:custom_group, custom_ice=:custom_ice,
+                    numBC=:numBC, showRacineInfo=:showRacineInfo";
             $stmt = $this->conn->prepare($query);
 
             if (!$this->id) $this->id = uniqid('doc_');
-            
+
             $stmt->bindParam(":id", $this->id);
             $stmt->bindParam(":numero", $this->numero);
             $stmt->bindParam(":type", $this->type);
@@ -118,7 +125,67 @@ class Document {
             $stmt->bindParam(":notes", $this->notes);
             $stmt->bindParam(":conditions", $this->conditions);
             $stmt->bindParam(":documentParentId", $this->documentParentId);
+            $stmt->bindParam(":custom_to", $this->custom_to);
+            $stmt->bindParam(":custom_co", $this->custom_co);
+            $stmt->bindParam(":custom_group", $this->custom_group);
+            $stmt->bindParam(":custom_ice", $this->custom_ice);
+            $stmt->bindParam(":numBC", $this->numBC);
+            $stmt->bindParam(":showRacineInfo", $this->showRacineInfo, PDO::PARAM_BOOL);
 
+            $stmt->execute();
+
+            foreach ($this->lignes as $ligne) {
+                $this->createLigne($ligne);
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            $this->error = $e->getMessage();
+            return false;
+        }
+    }
+
+    public function update() {
+        $this->conn->beginTransaction();
+        try {
+            $query = "UPDATE " . $this->table_name . " 
+                    SET numero=:numero, type=:type, clientId=:clientId, 
+                        dateCreation=:dateCreation, dateEcheance=:dateEcheance, statut=:statut, 
+                    totalHT=:totalHT, totalTVA=:totalTVA, totalTTC=:totalTTC, 
+                    notes=:notes, conditions=:conditions, documentParentId=:documentParentId,
+                    custom_to=:custom_to, custom_co=:custom_co, custom_group=:custom_group, custom_ice=:custom_ice,
+                    numBC=:numBC, showRacineInfo=:showRacineInfo
+                WHERE id=:id";
+            $stmt = $this->conn->prepare($query);
+
+            $stmt->bindParam(":id", $this->id);
+            $stmt->bindParam(":numero", $this->numero);
+            $stmt->bindParam(":type", $this->type);
+            $stmt->bindParam(":clientId", $this->clientId);
+            $stmt->bindParam(":dateCreation", $this->dateCreation);
+            $stmt->bindParam(":dateEcheance", $this->dateEcheance);
+            $stmt->bindParam(":statut", $this->statut);
+            $stmt->bindParam(":totalHT", $this->totalHT);
+            $stmt->bindParam(":totalTVA", $this->totalTVA);
+            $stmt->bindParam(":totalTTC", $this->totalTTC);
+            $stmt->bindParam(":notes", $this->notes);
+            $stmt->bindParam(":conditions", $this->conditions);
+            $stmt->bindParam(":documentParentId", $this->documentParentId);
+            $stmt->bindParam(":custom_to", $this->custom_to);
+            $stmt->bindParam(":custom_co", $this->custom_co);
+            $stmt->bindParam(":custom_group", $this->custom_group);
+            $stmt->bindParam(":custom_ice", $this->custom_ice);
+            $stmt->bindParam(":numBC", $this->numBC);
+            $stmt->bindParam(":showRacineInfo", $this->showRacineInfo, PDO::PARAM_BOOL);
+
+            $stmt->execute();
+
+            // Supprimer les lignes existantes pour les recréer
+            $query = "DELETE FROM lignes_documents WHERE documentId = ?";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(1, $this->id);
             $stmt->execute();
 
             foreach ($this->lignes as $ligne) {

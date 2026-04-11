@@ -5,6 +5,7 @@ class Client {
     private $table_name = "clients";
 
     public $id = "";
+    public $entrepriseId = null;
     public $nom = "";
     public $email = "";
     public $telephone = "";
@@ -13,6 +14,7 @@ class Client {
     public $codePostal = "";
     public $pays = "";
     public $siret = "";
+    public $ice = "";
     public $tva = "";
     public $produitsVedette = null;
     public $createdAt = "";
@@ -27,22 +29,33 @@ class Client {
         return $this->error;
     }
 
-    public function read($search = "", $offset = 0, $limit = 10) {
+    public function read($search = "", $offset = 0, $limit = 10, $entrepriseId = null) {
         $query = "SELECT * FROM " . $this->table_name;
+        $conditions = [];
+        $params = [];
+
         if ($search) {
-            $query .= " WHERE nom LIKE :search OR email LIKE :search OR ville LIKE :search";
+            $conditions[] = "(nom LIKE :search OR email LIKE :search OR ville LIKE :search)";
+            $params[':search'] = "%{$search}%";
         }
+
+        if ($entrepriseId) {
+            $conditions[] = "entrepriseId = :entrepriseId";
+            $params[':entrepriseId'] = $entrepriseId;
+        }
+
+        if (!empty($conditions)) {
+            $query .= " WHERE " . implode(" AND ", $conditions);
+        }
+
         $query .= " ORDER BY createdAt DESC LIMIT :offset, :limit";
 
         $stmt = $this->conn->prepare($query);
-        
-        if ($search) {
-            $searchParam = "%$search%";
-            $stmt->bindParam(":search", $searchParam);
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
         }
-        $stmt->bindParam(":offset", $offset, PDO::PARAM_INT);
-        $stmt->bindParam(":limit", $limit, PDO::PARAM_INT);
-        
+        $stmt->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt;
     }
@@ -69,12 +82,13 @@ class Client {
 
     public function create() {
         $query = "INSERT INTO " . $this->table_name . " 
-                SET id=:id, nom=:nom, email=:email, telephone=:telephone, adresse=:adresse, 
+                SET id=:id, entrepriseId=:entrepriseId, nom=:nom, email=:email, telephone=:telephone, adresse=:adresse, 
                     ville=:ville, codePostal=:codePostal, pays=:pays, siret=:siret, tva=:tva, produitsVedette=:produitsVedette";
         
         $stmt = $this->conn->prepare($query);
 
         $this->id = uniqid('cli_');
+        $this->entrepriseId = $this->entrepriseId ? htmlspecialchars(strip_tags($this->entrepriseId)) : null;
         $this->nom = htmlspecialchars(strip_tags($this->nom));
         $this->email = htmlspecialchars(strip_tags($this->email));
         $this->telephone = $this->telephone ? htmlspecialchars(strip_tags($this->telephone)) : "";
@@ -89,6 +103,7 @@ class Client {
         $produitsVedetteStr = $this->produitsVedette ? json_encode($this->produitsVedette) : null;
 
         $stmt->bindParam(":id", $this->id);
+        $stmt->bindParam(":entrepriseId", $this->entrepriseId);
         $stmt->bindParam(":nom", $this->nom);
         $stmt->bindParam(":email", $this->email);
         $stmt->bindParam(":telephone", $this->telephone);
@@ -115,13 +130,14 @@ class Client {
 
     public function update() {
         $query = "UPDATE " . $this->table_name . " 
-                SET nom=:nom, email=:email, telephone=:telephone, adresse=:adresse, 
+                SET entrepriseId=:entrepriseId, nom=:nom, email=:email, telephone=:telephone, adresse=:adresse, 
                     ville=:ville, codePostal=:codePostal, pays=:pays, siret=:siret, tva=:tva, produitsVedette=:produitsVedette
                 WHERE id=:id";
         
         $stmt = $this->conn->prepare($query);
 
         $this->id = htmlspecialchars(strip_tags($this->id));
+        $this->entrepriseId = $this->entrepriseId ? htmlspecialchars(strip_tags($this->entrepriseId)) : null;
         $this->nom = htmlspecialchars(strip_tags($this->nom));
         $this->email = htmlspecialchars(strip_tags($this->email));
         $this->telephone = $this->telephone ? htmlspecialchars(strip_tags($this->telephone)) : "";
@@ -136,6 +152,7 @@ class Client {
         $produitsVedetteStr = $this->produitsVedette ? json_encode($this->produitsVedette) : null;
 
         $stmt->bindParam(":id", $this->id);
+        $stmt->bindParam(":entrepriseId", $this->entrepriseId);
         $stmt->bindParam(":nom", $this->nom);
         $stmt->bindParam(":email", $this->email);
         $stmt->bindParam(":telephone", $this->telephone);

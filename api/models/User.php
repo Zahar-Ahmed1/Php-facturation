@@ -8,6 +8,7 @@ class User {
     public $nom;
     public $email;
     public $password;
+    public $mustChangePassword;
     public $createdAt;
 
     public function __construct($db) {
@@ -33,18 +34,19 @@ class User {
     }
 
     public function emailExists() {
-        $query = "SELECT id, nom, email, password FROM " . $this->table_name . " WHERE email = ? LIMIT 0,1";
+        $query = "SELECT id, nom, email, password, mustChangePassword FROM " . $this->table_name . " WHERE email = :email LIMIT 1";
         $stmt = $this->conn->prepare($query);
-        $this->email = htmlspecialchars(strip_tags($this->email));
-        $stmt->bindParam(1, $this->email);
+        $cleanEmail = trim(strip_tags($this->email));
+        $stmt->bindParam(":email", $cleanEmail);
         $stmt->execute();
 
-        if ($stmt->rowCount() > 0) {
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
             $this->id = $row['id'];
             $this->nom = $row['nom'];
             $this->email = $row['email'];
             $this->password = $row['password'];
+            $this->mustChangePassword = (bool)$row['mustChangePassword'];
             return true;
         }
         return false;

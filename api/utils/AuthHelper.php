@@ -1,7 +1,11 @@
 <?php
 
+require_once __DIR__ . '/../config/config.php';
+
 class AuthHelper {
-    private static $secret_key = "votre_cle_secrete_super_securisee_123456"; // À changer pour la prod
+    private static function secretKey(): string {
+        return fp_config()['jwt_secret'];
+    }
 
     public static function generateJWT($payload) {
         $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
@@ -12,7 +16,7 @@ class AuthHelper {
         $payload = json_encode($payload);
         $payload = self::base64UrlEncode($payload);
         
-        $signature = hash_hmac('sha256', "$header.$payload", self::$secret_key, true);
+        $signature = hash_hmac('sha256', "$header.$payload", self::secretKey(), true);
         $signature = self::base64UrlEncode($signature);
         
         return "$header.$payload.$signature";
@@ -29,7 +33,7 @@ class AuthHelper {
         $payload = $tokenParts[1];
         $signatureProvided = $tokenParts[2];
         
-        $signatureCheck = hash_hmac('sha256', "$header.$payload", self::$secret_key, true);
+        $signatureCheck = hash_hmac('sha256', "$header.$payload", self::secretKey(), true);
         $signatureCheck = self::base64UrlEncode($signatureCheck);
         
         if ($signatureCheck !== $signatureProvided) {

@@ -3,16 +3,43 @@ USE commercial_db;
 
 -- Table users
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id VARCHAR(50) PRIMARY KEY,
     nom VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user',
+    mustChangePassword BOOLEAN DEFAULT FALSE,
     createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table racines
+CREATE TABLE IF NOT EXISTS racines (
+    id VARCHAR(50) PRIMARY KEY,
+    nom VARCHAR(255) NOT NULL,
+    ville VARCHAR(100),
+    adresse VARCHAR(255),
+    ice VARCHAR(50),
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table entreprises
+CREATE TABLE IF NOT EXISTS entreprises (
+    id VARCHAR(50) PRIMARY KEY,
+    racineId VARCHAR(50) NOT NULL,
+    nom VARCHAR(255) NOT NULL,
+    ville VARCHAR(100),
+    email VARCHAR(255),
+    adresse VARCHAR(255),
+    ice VARCHAR(50),
+    pays VARCHAR(100),
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (racineId) REFERENCES racines(id) ON DELETE CASCADE
 );
 
 -- Table clients
 CREATE TABLE IF NOT EXISTS clients (
     id VARCHAR(50) PRIMARY KEY,
+    entrepriseId VARCHAR(50),
     nom VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     telephone VARCHAR(50),
@@ -23,7 +50,8 @@ CREATE TABLE IF NOT EXISTS clients (
     siret VARCHAR(20),
     tva VARCHAR(50),
     produitsVedette JSON DEFAULT NULL,
-    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (entrepriseId) REFERENCES entreprises(id) ON DELETE SET NULL
 );
 
 -- Table produits
@@ -55,6 +83,12 @@ CREATE TABLE IF NOT EXISTS documents (
     notes TEXT,
     conditions TEXT,
     documentParentId VARCHAR(50),
+    custom_to VARCHAR(255),
+    custom_co VARCHAR(255),
+    custom_group VARCHAR(255),
+    custom_ice VARCHAR(255),
+    numBC VARCHAR(100),
+    showRacineInfo BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE,
     FOREIGN KEY (documentParentId) REFERENCES documents(id) ON DELETE SET NULL
 );

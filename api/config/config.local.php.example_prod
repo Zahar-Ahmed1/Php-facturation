@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * Configuration de production pour Hostinger (facilyx.com).
+ * Renommez ce fichier en 'config.local.php' sur votre serveur Hostinger.
+ */
+return [
+    // Paramètres de la base de données (MySQL Hostinger)
+    'db_host' => 'localhost', 
+    'db_name' => 'votre_db_prod',
+    'db_user' => 'votre_user_prod',
+    'db_pass' => 'VOTRE_MOT_DE_PASSE_PROD',
+
+    // Sécurité
+    'jwt_secret' => 'Générer_Une_Cle_Tres_Longue_Et_Securisee_Ici_123456789',
+
+    // Intégration AI
+    'gemini_api_key' => 'votre_cle_api_gemini',
+];

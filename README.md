@@ -1,3 +1,4 @@
+
 # API Backend SaaS de Gestion Commerciale (PHP Natif)
 
 Cette API backend est conçue pour une application SaaS de facturation, développée en PHP natif (sans framework) pour être facilement déployable sur n'importe quel hébergement classique (cPanel, Apache, etc.).
@@ -11,15 +12,25 @@ L'API suit une structure **MVC (Modèle-Vue-Contrôleur)** simplifiée :
 
 ## 🚀 Installation
 1. Importez le fichier `api/database/schema.sql` dans votre base de données MySQL.
-2. Modifiez les identifiants de connexion dans `api/config/Database.php`.
+2. Configurez vos identifiants :
+   - Copiez `api/config/config.local.php.example` vers `api/config/config.local.php`.
+   - Modifiez les valeurs dans `api/config/config.local.php` (DB, JWT, Gemini API).
+   - *Alternativement, vous pouvez utiliser des variables d'environnement (DB_HOST, DB_NAME, DB_USER, DB_PASS, JWT_SECRET, GEMINI_API_KEY).*
 3. (Optionnel) Exécutez le seeder pour ajouter des données de test : `php seeder.php`.
 4. Assurez-vous que le module `mod_rewrite` est activé sur votre serveur Apache.
+
+## ⚙️ Configuration
+L'application utilise une hiérarchie de configuration :
+1. **Défauts** : Définis dans `api/config/config.php`.
+2. **Fichier Local** : `api/config/config.local.php` (Ignoré par Git, recommandé pour le développement et la production).
+3. **Variables d'Environnement** : Prioritaires sur les fichiers si elles sont définies (Idéal pour l'hébergement cloud ou Hostinger via `.htaccess`).
 
 ## 🔐 Authentification
 L'authentification utilise des **JSON Web Tokens (JWT)**.
 1. `POST /api/register` : Créer un compte.
 2. `POST /api/login` : Obtenir un token.
 3. Ajoutez le header `Authorization: Bearer <votre_token>` pour toutes les routes protégées.
+*Note : Pour la production, générez une clé secrète longue et aléatoire dans votre configuration.*
 
 ## 🛠️ Routes API
 Toutes les routes retournent du JSON et attendent du JSON en entrée.
@@ -40,7 +51,13 @@ Toutes les routes retournent du JSON et attendent du JSON en entrée.
 - `GET /api/documents` (Filtres: `?type=facture`, `?clientId=...`)
 - `POST /api/documents`
 - `POST /api/documents/convertir/{id}?to=facture` (Convertit un devis en facture)
-- `POST /api/documents/extraire` (Simulation extraction IA)
+- `POST /api/documents/extraire` : Extraction intelligente via IA (Gemini). Envoyez un fichier (PDF, Image) via `multipart/form-data`.
+
+## 🤖 Extraction par IA (Gemini)
+Cette API intègre Google Gemini pour extraire automatiquement les données des factures/devis numérisés.
+- **Endpoint** : `POST /api/documents/extraire`
+- **Format** : `multipart/form-data` avec le champ `file`.
+- **Requis** : Une clé API Gemini valide dans la configuration.
 
 ## 🔗 Intégration Angular (Exemple)
 

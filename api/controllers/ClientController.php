@@ -8,13 +8,13 @@ class ClientController extends BaseController {
     public function getAll() {
         $this->authenticate();
         $client = new Client($this->conn);
-        
         $search = isset($_GET['search']) ? $_GET['search'] : "";
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
+        $entrepriseId = isset($_GET['entrepriseId']) ? $_GET['entrepriseId'] : null;
         $offset = ($page - 1) * $limit;
 
-        $stmt = $client->read($search, $offset, $limit);
+        $stmt = $client->read($search, $offset, $limit, $entrepriseId);
         $num = $stmt->rowCount();
 
         if ($num > 0) {
